@@ -1,72 +1,65 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-# Define the scope and credentials for accessing Google Sheets API
-scope = ['https://spreadsheets.google.com/feeds',
-         'https://www.googleapis.com/auth/drive']
-credentials = ServiceAccountCredentials.from_json_keyfile_name('zoom.json', scope)
+# Set the Zoom admin credentials and the ID to search for
+admin_email = "sales-admin@criodo.com"
+admin_password = "Crio@123"
+search_id = "ping+mentor-6@criodo.com"
 
-# Authenticate and access the Google Sheets API
-client = gspread.authorize(credentials)
+# Set the path to the Chrome WebDriver executable
+webdriver_path = "path/to/chromedriver"
 
-# Open the Google Sheet by its title
-sheet = client.open('Zoom_Automation').sheet1
+# Initialize the Chrome WebDriver
+driver = webdriver.Chrome(executable_path=webdriver_path)
 
-# Define the JSON data
-data = {
-    "account_name": "account_01",
-    "archive_files": [
-        {
-            "download_url": "https://example.com/recording/download/Qg75t7xZBtEbAkjdlgbfdngBBBB",
-            "file_extension": "JSON",
-            "file_path": "/9090876528/path01/demo.mp4",
-            "file_size": 165743,
-            "file_type": "CHAT",
-            "id": "a2f19f96-9294-4f51-8134-6f0eea108eb2",
-            "individual": True,
-            "participant_email": "jchill@example.com",
-            "participant_join_time": "2021-03-12T02:07:27Z",
-            "participant_leave_time": "2021-03-12T02:12:27Z",
-            "recording_type": "chat_message",
-            "status": "completed",
-            "encryption_fingerprint": "abf85f0fe6a4db3cdd8c37e505e1dd18a34d9696170a14b5bc6395677472cf43",
-            "number_of_messages": 150
-        }
-    ],
-    "complete_time": "2021-03-12T02:12:27Z",
-    "duration": 1,
-    "duration_in_second": 1800,
-    "host_id": "Dhjdfgdkg8w",
-    "id": 553068284,
-    "is_breakout_room": False,
-    "meeting_type": "internal",
-    "parent_meeting_id": "atsXxhSEQWit9t+U02HXNQ==",
-    "recording_count": 2,
-    "start_time": "2021-04-26T05:23:18Z",
-    "timezone": "Asia/Shanghai",
-    "topic": "My Personal Meeting Room",
-    "total_size": 364463,
-    "type": 1,
-    "uuid": "yO3dfhh3t467UkQ==",
-    "status": "completed"
-}
+# Open the Zoom login page
+driver.get("https://zoom.us/signin")
+time.sleep(5)
+# Wait for the email field to be visible and enter the admin email
+email_field = WebDriverWait(driver, 5).until(
+    EC.visibility_of_element_located((By.ID, "email"))
+)
+email_field.send_keys(admin_email)
 
-# Flatten the nested JSON structure into a single level dictionary
-def flatten_dict(d, parent_key='', sep='_'):
-    items = []
-    for k, v in d.items():
-        new_key = f"{parent_key}{sep}{k}" if parent_key else k
-        if isinstance(v, dict):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
+# Enter the admin password and submit the form
+password_field = driver.find_element(By.ID, "password")
+password_field.send_keys(admin_password)
+password_field.submit()
 
-flattened_data = flatten_dict(data)
+# Wait for the user management system to load and navigate to it
+user_management_link = WebDriverWait(driver, 5).until(
+    EC.visibility_of_element_located((By.XPATH, "//a[@data-id='UserManagement']"))
+)
+user_management_link.click()
 
-# Write the data to the Google Sheet
-row = list(flattened_data.keys())
-values = list(flattened_data.values())
+# Wait for the search input field to be visible and enter the search ID
+search_input = WebDriverWait(driver, 10).until(
+    EC.visibility_of_element_located((By.ID, "searchBar"))
+)
+search_input.send_keys(search_id)
 
-sheet.append_row(row)
-sheet.append_row(values)
+# Click the search button
+search_button = driver.find_element(By.ID, "searchBtn")
+search_button.click()
+
+# Wait for the search results to load and click the export button for the desired user
+export_button = WebDriverWait(driver, 10).until(
+    EC.visibility_of_element_located((By.XPATH, f"//button[@data-jid='{search_id}']"))
+)
+export_button.click()
+
+# Wait for the export modal to open and click the export button
+export_modal = WebDriverWait(driver, 10).until(
+    EC.visibility_of_element_located((By.ID, "export-user-modal"))
+)
+export_button = export_modal.find_element(By.XPATH, "//button[text()='Export']")
+export_button.click()
+
+# Wait for the export to finish and close the browser
+WebDriverWait(driver, 30).until(EC.number_of_windows_to_be(1))
+driver.quit()
+
+
